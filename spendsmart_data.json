@@ -1,0 +1,12 @@
+{
+  "total_budget": 1000,
+  "items": [
+    {
+      "id": "f92fddc3",
+      "name": "Physics Textbook",
+      "cost": 250,
+      "value": 9,
+      "is_purchased": false
+    }
+  ]
+}

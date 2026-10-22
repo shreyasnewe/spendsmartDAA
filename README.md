@@ -1,229 +1,128 @@
-# SpendSmart — Smart Budget Optimizer with C++ Backend
+# SpendSmart — Smart Budget Optimizer (Python & Streamlit)
 
-A full-stack, genuine budgeting application combining a **C++ HTTP Backend** executing the **0/1 Knapsack Dynamic Programming algorithm** with a modern **React + TypeScript** frontend.
+A 3rd-Year B.Tech Data Structures and Algorithms (DAA) Mini-Project implementing the **0/1 Knapsack Dynamic Programming Algorithm** entirely in **Python** with an interactive **Streamlit** user interface.
 
----
-
-## 1. Architecture Overview
-
-- **Backend (C++):**
-  - Standalone HTTP server built using `cpp-httplib` and `nlohmann/json`.
-  - Implements the exact 0/1 Knapsack Dynamic Programming recurrence relation with backtracking reconstruction.
-  - Serves RESTful endpoints:
-    - `GET /api/health` — Returns server status, version, and engine identification.
-    - `POST /api/optimize` — Accepts budget capacity and candidate items, runs the $O(n \cdot W)$ DP algorithm, and returns the mathematically optimal subset, total value score, total cost, remaining budget, and itemized exclusion reasons.
-  - Configured with CORS for frontend connectivity.
-  - Runs on port `5000` (configurable via CLI argument or `PORT` environment variable).
-
-- **Frontend (React + TypeScript):**
-  - Communicates with the C++ backend over real HTTP requests.
-  - Validates budget inputs and purchase items.
-  - Displays remaining budget after deducting already-purchased expenses.
-  - Marks recommendations as outdated whenever budget or items change.
-  - Connects to the C++ backend via Vite's proxy (`/api` -> `http://127.0.0.1:5000`).
+No separate servers, compilation, C++, or Node.js are required. The complete application runs with a single command.
 
 ---
 
-## 2. Dynamic Programming Algorithm (C++)
+## 1. Project Overview & DAA Concept
 
-Implemented in `backend/knapsack.hpp`.
+SpendSmart models personal financial budgeting as a classic **0/1 Knapsack Problem**:
+- **Knapsack Capacity ($W$):** Available budget in integer Indian Rupees ($W = \text{Total Budget} - \text{Purchased Spending}$).
+- **Candidate Items ($n$):** Unpurchased planned expenses entered by the user.
+- **Item Weight ($w_i$):** Estimated cost in rupees ($\text{cost}[i]$).
+- **Item Value ($v_i$):** User utility or priority score from 1 to 10 ($\text{value}[i]$).
+- **Decision:** $x_i \in \{0, 1\}$. Each planned item is either included completely ($x_i = 1$) or excluded ($x_i = 0$).
 
-### State Formulation
-Let $DP[i][w]$ be the maximum total priority score achievable considering the first $i$ candidate items within integer budget capacity $w$ ($0 \le w \le W$).
+### Dynamic Programming Recurrence
+Implemented in `optimizer.py`:
 
-### Recurrence Relation
-```cpp
-// Base cases
-DP[0][w] = 0   (for all w ∈ [0, W])
-DP[i][0] = 0   (for all i ∈ [0, n])
+$$\text{Base Cases: } DP[0][w] = 0, \quad DP[i][0] = 0$$
 
-// State transition
-for (int i = 1; i <= n; ++i) {
-    for (int w = 0; w <= W; ++w) {
-        if (cost[i] > w) {
-            DP[i][w] = DP[i - 1][w];
-        } else {
-            DP[i][w] = std::max(
-                DP[i - 1][w],
-                value[i] + DP[i - 1][w - cost[i]]
-            );
-        }
-    }
-}
-```
+$$\text{If } \text{cost}[i] > w: \quad DP[i][w] = DP[i-1][w]$$
 
-### Backtracking Reconstruction
-Starting from cell $(n, W)$:
-- If $DP[i][w] \ne DP[i - 1][w]$, item $i$ was included. The server appends item $i$ to the selection list, deducts its cost ($w \leftarrow w - \text{cost}[i]$), and moves to row $i - 1$.
-- If $DP[i][w] = DP[i - 1][w]$, item $i$ was not included, and the server moves to row $i - 1$.
+$$\text{Otherwise: } DP[i][w] = \max\Big(DP[i-1][w],\; \text{value}[i] + DP[i-1][w - \text{cost}[i]]\Big)$$
+
+### Backtracking Recovery
+Starting from cell $(n, W)$ down to $(1, 0)$:
+- If $DP[i][w] \ne DP[i-1][w]$, item $i$ was chosen. Its cost is subtracted ($w \leftarrow w - \text{cost}[i]$), and backtracking continues to row $i-1$.
+- If $DP[i][w] = DP[i-1][w]$, item $i$ was not included, and backtracking moves to row $i-1$.
 
 ### Complexity
-- **Time Complexity:** $O(n \cdot W)$ — Instantaneous for personal budgeting ($\approx 0.02$ ms).
-- **Space Complexity:** $O(n \cdot W)$ — 2D matrix of size $(n + 1) \times (W + 1)$ for full item reconstruction.
-- **Safety Limit:** Budget is capped at ₹25,000 to prevent unbounded memory allocation.
+- **Time Complexity:** $O(n \cdot W)$ — Instantaneous execution for personal budgeting ranges.
+- **Space Complexity:** $O(n \cdot W)$ — Table of size $(n + 1) \times (W + 1)$ to allow exact item set reconstruction.
+- **Memory Safety:** Budget input is bounded to ₹25,000 to prevent unbounded memory allocation.
 
 ---
 
-## 3. How to Run on Windows
+## 2. Why Greedy Fails (Classic Viva Question)
 
-You will run the project using **two command prompt terminals**:
+A greedy algorithm sorting by value-to-cost ratio ($v_i / w_i$) or highest score first fails in 0/1 Knapsack because items are indivisible:
 
-### Terminal 1: Compile and Start the C++ Backend
+### Counterexample:
+- **Budget Capacity ($W$):** ₹500
+- **Item A:** Cost ₹300, Value 8 (Ratio = $8/300 = 0.0267$)
+- **Item B:** Cost ₹250, Value 6 (Ratio = $6/250 = 0.0240$)
+- **Item C:** Cost ₹250, Value 6 (Ratio = $6/250 = 0.0240$)
 
-#### Option A: Using the Automated Scripts
-Double-click or run:
+- **Greedy Outcome:** Takes Item A (highest ratio). Remaining budget = ₹200. Neither Item B nor Item C fits.  
+  $\to$ **Total Value = 8** (Cost = ₹300).
+- **Dynamic Programming Outcome:** Considers combinatorial subproblems and selects **Item B + Item C** ($250 + 250 = ₹500$).  
+  $\to$ **Total Value = 12** (Cost = ₹500).
+- **Viva Conclusion:** DP produces $+4$ higher utility than greedy for the exact same budget constraint!
+
+---
+
+## 3. How to Run Locally on Windows
+
+Run the entire application in your command prompt using the following commands:
+
 ```cmd
-cd backend
-run.bat
-```
-`run.bat` automatically checks for a compiler (`g++` via MinGW or `cl.exe` via Visual Studio MSVC), builds `spendsmart_server.exe` if not already present, and starts the server on port `5000`.
-
-#### Option B: Manual Compilation with MinGW (g++)
-```cmd
-cd backend
-g++ -std=c++17 -O2 main.cpp -o spendsmart_server.exe -lws2_32
-spendsmart_server.exe 5000
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-#### Option C: Manual Compilation with Microsoft Visual C++ (MSVC)
-Open **Developer Command Prompt for VS**:
-```cmd
-cd backend
-cl /std:c++17 /O2 /EHsc /utf-8 /I. main.cpp /Fe:spendsmart_server.exe ws2_32.lib
-spendsmart_server.exe 5000
+The application will automatically open in your default browser at:
+```
+http://localhost:8501
 ```
 
-You should see:
-```
-========================================================
- SpendSmart C++ 0/1 Knapsack Server started on port 5000
- Health: http://localhost:5000/api/health
- Optimize: POST http://localhost:5000/api/optimize
-========================================================
+Both the user interface and the 0/1 Knapsack optimization logic run entirely through this single Streamlit application. No second terminal, compilation, or backend server is needed.
+
+---
+
+## 4. How to Run on macOS / Linux
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
 ---
 
-### Terminal 2: Start the React Frontend
+## 5. Application Features & Rules
 
-In the root project folder:
-```cmd
-npm install
-npm run dev
-```
+1. **Section A — Budget Overview:**
+   - Configure total budget in Indian Rupees (₹).
+   - Real-time display of **Total Budget**, **Purchased Spending**, and **Remaining Available Budget**.
+   - Input validation prevents negative values and rejects lowering the budget below already-purchased expenses.
 
-Open your browser and navigate to:
-```
-http://localhost:3000
-```
-The React frontend will automatically connect to the C++ backend through Vite's local proxy.
+2. **Section B — Add an Expense:**
+   - Enter Item Name, Cost (₹), and Priority Score (1 to 10).
+   - Strict validation: Rejects blank names, non-positive costs, or scores outside 1–10.
 
----
+3. **Section C — Spending Item List:**
+   - Displays real user-entered items with cost and priority ratings.
+   - **"Done" (Mark as purchased):** Deducts item cost from available budget and excludes it from future optimization.
+   - **"Undo":** Restores purchased item back to planned status.
+   - **"Remove":** Deletes item from list.
+   - Any list change flags previous optimization results as outdated.
 
-## 4. How to Run on Linux / macOS
+4. **Section D — Optimize My Budget:**
+   - Click **"Find My Best Spending Plan"** to execute `solve_knapsack` in `optimizer.py`.
+   - Displays recommended combination, total recommended cost, combined utility score, remaining surplus budget, and execution duration.
+   - Detailed list of unselected items with individual reasons.
 
-### Terminal 1: C++ Backend
-```bash
-cd backend
-./build.sh
-./run.sh
-```
+5. **Section E — Algorithm Explanation:**
+   - Expandable DAA mini-project and viva study guide with problem formulation, recurrence relation, backtracking steps, complexity analysis, and greedy counterexample.
 
-### Terminal 2: React Frontend
-```bash
-npm install
-npm run dev
-```
+6. **Local Persistence:**
+   - Budget and item lists are saved automatically to `spendsmart_data.json` to survive application restarts.
 
 ---
 
-## 5. API Endpoints
-
-### `GET /api/health`
-Checks server status.
-```bash
-curl http://localhost:5000/api/health
-```
-**Response:**
-```json
-{
-  "status": "ok",
-  "service": "SpendSmart C++ Backend",
-  "algorithm": "0/1 Knapsack Dynamic Programming",
-  "version": "1.0.0"
-}
-```
-
-### `POST /api/optimize`
-Runs the 0/1 Knapsack optimization algorithm.
-```bash
-curl -X POST http://localhost:5000/api/optimize \
-  -H "Content-Type: application/json" \
-  -d '{
-    "budget": 500,
-    "items": [
-      {"id": "1", "name": "Headphones", "cost": 300, "value": 8},
-      {"id": "2", "name": "Backpack", "cost": 250, "value": 6},
-      {"id": "3", "name": "Power Bank", "cost": 250, "value": 6}
-    ]
-  }'
-```
-**Response:**
-```json
-{
-  "backend": "C++ 0/1 Knapsack Dynamic Programming Engine",
-  "budgetCapacity": 500,
-  "executionTimeMs": 0.024,
-  "itemCount": 3,
-  "totalCost": 500,
-  "totalValue": 12,
-  "remainingBudget": 0,
-  "selectedIds": ["2", "3"],
-  "selectedItems": [
-    {"cost": 250, "id": "2", "name": "Backpack", "value": 6},
-    {"cost": 250, "id": "3", "name": "Power Bank", "value": 6}
-  ],
-  "excludedIds": ["1"],
-  "excludedItems": [
-    {
-      "cost": 300,
-      "id": "1",
-      "name": "Headphones",
-      "value": 8,
-      "reason": "Item requires ₹300, but remaining surplus after selecting higher-utility items is only ₹0."
-    }
-  ]
-}
-```
-
----
-
-## 6. Project Directory Layout
+## 6. Project Structure
 
 ```
-├── index.html                   # Entry HTML
-├── package.json                 # React dependencies and scripts
-├── vite.config.ts               # Vite configuration with /api proxy to C++ backend
-├── backend/                     # Dedicated C++ HTTP Server
-│   ├── main.cpp                 # Server entry point, routing, and CORS handling
-│   ├── knapsack.hpp             # 0/1 Knapsack DP algorithm, validation, & backtracking
-│   ├── include/
-│   │   ├── httplib.h            # Single-header HTTP library (cpp-httplib)
-│   │   └── json.hpp             # Modern C++ JSON library (nlohmann/json)
-│   ├── build.bat                # Windows build script (MinGW/MSVC)
-│   ├── run.bat                  # Windows launch script
-│   ├── build.sh                 # Linux/macOS build script
-│   └── run.sh                   # Linux/macOS launch script
-└── src/
-    ├── App.tsx                  # Main single-page UI orchestrator
-    ├── types.ts                 # TypeScript interfaces (budgets, items, backend responses)
-    ├── services/
-    │   └── api.ts               # Fetch client for C++ backend endpoints
-    ├── data/
-    │   └── presets.ts           # Sample presets
-    └── components/
-        ├── BudgetSection.tsx    # Budget configuration and summary
-        ├── AddItemSection.tsx   # Item addition form with validation
-        ├── ExpenseListSection.tsx# Interactive list with "Mark as purchased"
-        └── OptimizationSection.tsx# Backend trigger, results breakdown, & DP explainer
+spendsmart/
+├── app.py               # Streamlit user interface & state management
+├── optimizer.py         # 0/1 Knapsack Dynamic Programming algorithm
+├── requirements.txt     # Python dependencies (Streamlit)
+├── README.md            # Documentation and setup instructions
+└── spendsmart_data.json # Local persistence file (auto-generated)
 ```
