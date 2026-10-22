@@ -1,0 +1,6 @@
+{
+  "name": "SpendSmart — Smart Budget Optimizer",
+  "description": "A 0/1 Knapsack Dynamic Programming budget optimizer powered by a C++ backend HTTP server and React frontend.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
